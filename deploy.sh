@@ -62,7 +62,18 @@ sudo chmod 755 /etc/nginx/sites-available /etc/nginx/sites-enabled
 echo "📦 Installing dependencies..."
 cd $APP_DIR
 npm install
+
+# Build the project
+echo "🔨 Building application..."
 npm run build
+
+# Verify build was successful
+if [ ! -f "$APP_DIR/dist/index.js" ]; then
+    echo "❌ Build failed - dist/index.js not found"
+    exit 1
+fi
+
+echo "✅ Build completed successfully"
 
 # Create environment file
 echo "📝 Creating environment configuration..."
