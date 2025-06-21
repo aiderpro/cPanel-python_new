@@ -102,8 +102,10 @@ export class MemStorage implements IStorage {
   async createDomain(domainData: Omit<InsertDomain, 'installSsl'>): Promise<Domain> {
     const id = this.currentDomainId++;
     const domain: Domain = {
-      ...domainData,
       id,
+      name: domainData.name,
+      sslStatus: domainData.sslStatus || "no_ssl",
+      sslExpiryDate: domainData.sslExpiryDate || null,
       createdAt: new Date(),
     };
     this.domains.set(id, domain);

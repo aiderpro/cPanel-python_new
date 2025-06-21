@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Globe, Shield, Edit, Trash2, Search, RefreshCw } from "lucide-react";
+import { Globe, Shield, Edit, Trash2, Search, RefreshCw, AlertTriangle, XCircle, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -110,6 +110,21 @@ export default function DomainTable({ domains, isLoading, onDeleteDomain }: Doma
               const daysToExpire = calculateDaysToExpire(domain.sslExpiryDate);
               const statusInfo = getSSLStatusInfo(domain.sslStatus);
               
+              const renderIcon = () => {
+                switch (statusInfo.iconName) {
+                  case "Shield":
+                    return <Shield className="mr-1 h-3 w-3" />;
+                  case "AlertTriangle":
+                    return <AlertTriangle className="mr-1 h-3 w-3" />;
+                  case "XCircle":
+                    return <XCircle className="mr-1 h-3 w-3" />;
+                  case "X":
+                    return <X className="mr-1 h-3 w-3" />;
+                  default:
+                    return null;
+                }
+              };
+              
               return (
                 <tr key={domain.id} className="hover:bg-slate-50 transition-colors">
                   <td className="py-4 px-6">
@@ -120,7 +135,7 @@ export default function DomainTable({ domains, isLoading, onDeleteDomain }: Doma
                   </td>
                   <td className="py-4 px-6">
                     <Badge variant={statusInfo.variant} className={statusInfo.className}>
-                      {statusInfo.icon}
+                      {renderIcon()}
                       {statusInfo.label}
                     </Badge>
                   </td>

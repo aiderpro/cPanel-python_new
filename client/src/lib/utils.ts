@@ -1,6 +1,5 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { Shield, AlertTriangle, XCircle, X } from "lucide-react";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -24,21 +23,21 @@ export function getSSLStatusInfo(status: string) {
         label: "Valid",
         variant: "default" as const,
         className: "bg-emerald-100 text-emerald-700",
-        icon: <Shield className="mr-1 h-3 w-3" />,
+        iconName: "Shield" as const,
       };
     case "expiring_soon":
       return {
         label: "Expiring Soon",
         variant: "secondary" as const,
         className: "bg-amber-100 text-amber-700",
-        icon: <AlertTriangle className="mr-1 h-3 w-3" />,
+        iconName: "AlertTriangle" as const,
       };
     case "expired":
       return {
         label: "Expired",
         variant: "destructive" as const,
         className: "bg-red-100 text-red-700",
-        icon: <XCircle className="mr-1 h-3 w-3" />,
+        iconName: "XCircle" as const,
       };
     case "no_ssl":
     default:
@@ -46,7 +45,7 @@ export function getSSLStatusInfo(status: string) {
         label: "No SSL",
         variant: "outline" as const,
         className: "bg-slate-100 text-slate-700",
-        icon: <X className="mr-1 h-3 w-3" />,
+        iconName: "X" as const,
       };
   }
 }
