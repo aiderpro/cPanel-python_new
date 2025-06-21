@@ -1,0 +1,124 @@
+import subprocess
+import os
+
+def generate_nginx_config(server_name):
+    config = f'''
+server {{
+    server_name {server_name} www.{server_name};
+    root /data/site/public;
+    add_header X-Frame-Options "SAMEORIGIN";
+    add_header X-XSS-Protection "1; mode=block";
+    add_header X-Content-Type-Options "nosniff";
+    index index.php index.html index.htm;
+    charset utf-8;
+       location / {{
+        proxy_read_timeout     60;
+        proxy_connect_timeout  60;
+        proxy_redirect off;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_cache_bypass $http_upgrade;
+        proxy_set_header Host $host ;
+        proxy_set_header X-Real-IP $remote_addr ;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for ;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_pass             http://localhost:3000;
+    }}
+    location @rules {{
+        rewrite ^(.*)$ $1.php last;
+    }}
+    location = /favicon.ico {{
+        access_log off;
+        log_not_found off;
+    }}
+    location = /robots.txt {{
+        access_log off;
+        log_not_found off;
+    }}
+    error_page 404 /index.php;
+    location ~ \.php$ {{
+        fastcgi_pass unix:/var/run/php-fpm/www.sock;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        include fastcgi_params;
+    }}
+    location ~ /\.(?!well-known).* {{
+        deny all;
+    }}
+}}
+'''
+
+    return config
+
+def execute_command(command):
+    process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    output, _ = process.communicate()
+    return process.returncode, output.decode()
+
+def generate_nginx_config_and_ssl():
+    server_name = input('Enter the server name: ')
+
+    # Generate Nginx configuration file
+    config = generate_nginx_config(server_name)
+    file_path = f'/etc/nginx/sites-available/{server_name}.conf'
+
+    if not os.path.exists(file_path):
+        with open(file_path, 'w') as f:
+            f.write(config)
+        print(f'Nginx configuration file {file_path} has been created successfully.')
+    else:
+        print(f'Nginx configuration file {file_path} already exists.')
+        return
+
+    # Create symbolic link to sites-enabled
+    link_path = f'/etc/nginx/sites-enabled/{server_name}.conf'
+    if not os.path.exists(link_path):
+        os.symlink(file_path, link_path)
+        print(f'Symbolic link to {file_path} has been created in sites-enabled.')
+    else:
+        print(f'Symbolic link to {file_path} already exists in sites-enabled.')
+        return
+
+    # Reload Nginx
+    return_code, output = execute_command('sudo service nginx reload')
+    if return_code == 0:
+        print('Nginx has been reloaded successfully.')
+    else:
+        print('Failed to reload Nginx.')
+        return
+#Generating SSL Certificate-Debug option
+
+def generate_ssl_certificate(server_name):
+    print(f'Generating SSL certificate for {server_name}...')
+    command = f'sudo certbot --nginx -d {server_name} -d www.{server_name} -m shijo@aiderpro.in --debug-challenges --agree-tos --no-eff-email'
+
+    # Execute the command
+    return_code, output = execute_command(command)
+
+    if return_code == 0:
+        print(f'SSL certificate for {server_name} has been generated successfully.')
+    else:
+        print(f'Error generating SSL certificate for {server_name}. Output: {output}')
+        if 'debug-challenges' in command:
+            print('Please complete the challenges manually, then press Enter to continue...')
+            input()  # Wait for user input before proceeding
+
+
+    # Modify Nginx configuration for redirection
+    with open(file_path, 'r') as f:
+        config_data = f.read()
+
+    config_data = config_data.replace('listen 80;\n    return 404;', 'listen 80;\n        return 301 https://$host$request_uri;')
+
+    with open(file_path, 'w') as f:
+        f.write(config_data)
+
+
+    # Reload Nginx
+    return_code, output = execute_command('sudo service nginx reload')
+    if return_code == 0:
+        print('Nginx has been reloaded successfully.')
+    else:
+        print('Failed to reload Nginx.')
+
+generate_nginx_config_and_ssl()

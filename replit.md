@@ -2,7 +2,7 @@
 
 ## Overview
 
-This is a full-stack web application for managing domains and SSL certificates. The application provides a dashboard interface for adding, viewing, and managing domains with their SSL certificate status. It features a modern React frontend with a Node.js/Express backend, using PostgreSQL for data persistence.
+This is a full-stack web application for managing domains and SSL certificates on Linux servers. The application provides a dashboard interface for adding, viewing, and managing domains with their SSL certificate status. It features a modern React frontend with a Node.js/Express backend that integrates with Python scripts for actual domain and SSL management using nginx and acme.sh.
 
 ## System Architecture
 
@@ -18,14 +18,15 @@ This is a full-stack web application for managing domains and SSL certificates. 
 ### Backend Architecture
 - **Runtime**: Node.js with TypeScript
 - **Framework**: Express.js for REST API
-- **Database ORM**: Drizzle ORM with PostgreSQL
-- **Database Provider**: Neon Database (serverless PostgreSQL)
+- **Domain Management**: Python scripts for nginx and SSL operations
+- **SSL Provider**: acme.sh with Let's Encrypt certificates
+- **Web Server**: nginx configuration management
 - **Development**: Hot reload with tsx
 - **Build**: esbuild for production bundling
 
 ### Project Structure
 - `client/` - React frontend application
-- `server/` - Express.js backend API
+- `server/` - Express.js backend API and Python domain management scripts
 - `shared/` - Shared TypeScript types and schemas
 - `components.json` - shadcn/ui configuration
 
@@ -37,16 +38,17 @@ This is a full-stack web application for managing domains and SSL certificates. 
 - **Validation**: Zod schemas for type-safe data validation
 
 ### API Endpoints (`server/routes.ts`)
-- `GET /api/domains` - Retrieve all domains
+- `GET /api/domains` - Retrieve all domains from nginx sites-available
 - `GET /api/domains/stats` - Get domain statistics
-- `POST /api/domains` - Create new domain with optional SSL installation
-- `POST /api/domains/:id/ssl` - Install SSL certificate for domain
-- `DELETE /api/domains/:id` - Remove domain
+- `POST /api/domains` - Create new domain with nginx configuration and optional SSL installation
+- `POST /api/domains/:id/ssl` - Install SSL certificate using acme.sh
+- `DELETE /api/domains/:id` - Remove domain from nginx sites-available and sites-enabled
 
-### Storage Layer (`server/storage.ts`)
-- **Memory Storage**: In-memory implementation for development
-- **Interface**: IStorage interface allows switching to database implementations
-- **Sample Data**: Pre-seeded with example domains for demonstration
+### Domain Management Layer (`server/domain_manager.py`)
+- **Nginx Integration**: Manages nginx site configurations in `/etc/nginx/sites-available` and `/etc/nginx/sites-enabled`
+- **SSL Management**: Uses acme.sh for Let's Encrypt SSL certificate generation and installation
+- **Real Domain Operations**: Actual server-side domain and SSL management with nginx testing and reloading
+- **SSL Expiry Tracking**: Calculates days to expiry and SSL status based on actual certificate files
 
 ### Frontend Components
 - **Dashboard**: Main application view with domain management

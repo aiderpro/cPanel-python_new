@@ -1,0 +1,127 @@
+#!/bin/bash
+echo -e "\e[1;32m=================================================================\e[0m"
+echo -e "\e[1;32m       Installing a New SSL Certificate or force renewal         \e[0m"
+echo -e "\e[1;32m=================================================================\e[0m"
+read -p "Enter domain (without www): " DOMAIN
+#Forcerenewal check
+#
+SSL_DIR="/etc/ssl/acme"
+
+if [ -z "$DOMAIN" ]; then
+    echo "Usage: $0 yourdomain.com"
+    exit 1
+fi
+
+CERT_PATH="$SSL_DIR/$DOMAIN.crt"
+
+if [ -f "$CERT_PATH" ]; then
+    END_DATE=$(openssl x509 -enddate -noout -in "$CERT_PATH" | cut -d= -f2)
+    END_DATE_SEC=$(date -d "$END_DATE" +%s)
+    NOW_SEC=$(date +%s)
+    DAYS_LEFT=$(( (END_DATE_SEC - NOW_SEC) / 86400 ))
+
+    echo "🔍 Certificate found for $DOMAIN"
+    echo "📅 Expiry: $END_DATE ($DAYS_LEFT days left)"
+
+    if [ "$DAYS_LEFT" -gt 30 ]; then
+        echo -n "❓ Domain has $DAYS_LEFT days left. Do you want to forcefully renew it? (yes/no): "
+        read FORCE_ANSWER
+        if [[ "$FORCE_ANSWER" != "yes" ]]; then
+            echo "✅ Skipping renewal for $DOMAIN"
+            exit 0
+        else
+            echo "🔄 Proceeding with force renewal..."
+        fi
+    else
+        echo "⚠️  Certificate is close to expiry. Proceeding with renewal."
+    fi
+fi
+#forcerenewl ENds
+
+NGINX_CONF_DIR="/etc/nginx/sites-available"
+SSL_DIR="/etc/ssl/acme"
+WEBROOT="/var/www/letsencrypt"
+ACME_HOME="/root/.acme.sh"
+CONF_FILE="$NGINX_CONF_DIR/$DOMAIN.conf"
+
+if [ ! -f "$CONF_FILE" ]; then
+    echo "❌ NGINX conf not found at $CONF_FILE"
+    exit 1
+fi
+
+echo "✅ Found NGINX conf: $CONF_FILE"
+
+# === Step 1: Ensure acme.sh is installed ===
+if ! command -v acme.sh >/dev/null 2>&1; then
+    echo "📦 Installing acme.sh..."
+    curl https://get.acme.sh | sh
+    export PATH=~/.acme.sh:$PATH
+else
+    echo "✅ acme.sh already installed."
+fi
+
+# === Step 2: Ensure well-known webroot exists ===
+mkdir -p "$WEBROOT"
+chown -R nginx:nginx "$WEBROOT"
+
+# === Step 3: Add well-known location block to port 80 server if missing ===
+if ! grep -q ".well-known/acme-challenge" "$CONF_FILE"; then
+    echo "🔧 Adding .well-known/acme-challenge location block to port 80 server..."
+
+    LINE80=$(awk "/server_name $DOMAIN/"'{print NR; exit}' "$CONF_FILE")
+    if [ -n "$LINE80" ]; then
+        sed -i "$((LINE80+1))i \\    location ^~ /.well-known/acme-challenge/ {\n        root /var/www/letsencrypt;\n        default_type \"text/plain\";\n        try_files \$uri =404;\n    }" "$CONF_FILE"
+    fi
+fi
+
+# === Step 4: Reload NGINX to enable challenge handling ===
+echo "🔄 Reloading NGINX to apply temporary config..."
+nginx -t && systemctl reload nginx
+if [ $? -ne 0 ]; then
+    echo "❌ NGINX reload failed. Aborting."
+    exit 1
+fi
+
+# === Step 5: Issue certificate using acme.sh ===
+echo "🔐 Requesting SSL certificate via acme.sh..."
+ACME_COMMAND="~/.acme.sh/acme.sh --issue -d $DOMAIN -d www.$DOMAIN --webroot /var/www/letsencrypt"
+
+if [[ "$FORCE_ANSWER" == "yes" ]]; then
+    ACME_COMMAND="$ACME_COMMAND --force"
+fi
+
+echo "⚙️ Running: $ACME_COMMAND"
+eval $ACME_COMMAND
+
+if [ $? -ne 0 ]; then
+    echo "❌ Certificate issue failed"
+    exit 1
+else
+    echo "✅ Certificate successfully issued or renewed"
+fi
+
+# === Step 6: Install the certificate to custom location ===
+mkdir -p "$SSL_DIR"
+~/.acme.sh/acme.sh --install-cert -d "$DOMAIN" \
+--key-file "$SSL_DIR/$DOMAIN.key" \
+--fullchain-file "$SSL_DIR/$DOMAIN.crt" \
+--reloadcmd "systemctl reload nginx"
+
+# === Step 7: Inject SSL config into NGINX ===
+echo "🛠 Updating NGINX config with SSL paths..."
+LINE443=$(awk "/server_name $DOMAIN/"'{print NR; exit}' "$CONF_FILE")
+
+if grep -q "ssl_certificate $SSL_DIR/$DOMAIN.crt" "$CONF_FILE"; then
+    echo "⚠️  SSL config already present in $CONF_FILE. Skipping insertion."
+else
+    sed -i "$((LINE443+1))i \\    listen 443 ssl;\n    ssl_certificate $SSL_DIR/$DOMAIN.crt;\n    ssl_certificate_key $SSL_DIR/$DOMAIN.key;" "$CONF_FILE"
+fi
+
+# === Step 8: Final test & reload ===
+echo "🔁 Testing NGINX config..."
+nginx -t && systemctl reload nginx
+if [ $? -eq 0 ]; then
+    echo "✅ SSL successfully installed via acme.sh and NGINX reloaded."
+else
+    echo "❌ NGINX config test failed. Please fix manually."
+fi
