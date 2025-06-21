@@ -7,7 +7,7 @@ import path from "path";
 
 function executePythonScript(action: string, ...args: string[]): Promise<any> {
   return new Promise((resolve, reject) => {
-    const pythonScript = path.join(process.cwd(), "server", "python_api.py");
+    const pythonScript = path.join(process.cwd(), "server", "secure_api.py");
     const pythonProcess = spawn("python", [pythonScript, action, ...args]);
     
     let output = "";
@@ -97,7 +97,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Install SSL for a domain
+  // Prepare SSL configuration for a domain
   app.post("/api/domains/:id/ssl", async (req, res) => {
     try {
       const domainId = req.params.id;
@@ -113,22 +113,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Domain not found" });
       }
 
-      const result = await executePythonScript("install_ssl", domain.name);
+      const result = await executePythonScript("prepare_ssl", domain.name);
       
       if (result.success) {
-        // Get updated domain info
-        const updatedDomainsResult = await executePythonScript("list");
-        if (updatedDomainsResult.success) {
-          const updatedDomain = updatedDomainsResult.data.find((d: any) => d.name === domain.name);
-          res.json(updatedDomain || domain);
-        } else {
-          res.json(domain);
-        }
+        res.json({ 
+          message: result.message,
+          manual_steps: result.manual_steps,
+          domain: domain.name
+        });
       } else {
         res.status(500).json({ message: result.message });
       }
     } catch (error) {
-      res.status(500).json({ message: "Failed to install SSL certificate" });
+      res.status(500).json({ message: "Failed to prepare SSL configuration" });
     }
   });
 
