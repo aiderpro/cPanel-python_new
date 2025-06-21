@@ -7,8 +7,8 @@ import path from "path";
 
 function executePythonScript(action: string, ...args: string[]): Promise<any> {
   return new Promise((resolve, reject) => {
-    const pythonScript = path.join(process.cwd(), "server", "secure_api.py");
-    const pythonProcess = spawn("python", [pythonScript, action, ...args]);
+    const pythonScript = path.join(process.cwd(), "server", "production_api.py");
+    const pythonProcess = spawn("python3", [pythonScript, action, ...args]);
     
     let output = "";
     let errorOutput = "";
