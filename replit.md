@@ -106,7 +106,10 @@ This is a full-stack web application for managing domains and SSL certificates o
 
 ```
 Changelog:
-- June 21, 2025. Initial setup
+- June 21, 2025. Initial setup with React frontend and in-memory storage
+- June 21, 2025. Converted to secure Python-based domain management system
+- June 21, 2025. Implemented file-only operations for production security
+- June 21, 2025. Created production deployment scripts and documentation
 ```
 
 ## User Preferences
