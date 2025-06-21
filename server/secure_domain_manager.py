@@ -152,7 +152,7 @@ class SecureDomainManager:
         include fastcgi_params;
     }}
     
-    location ~ /\.(?!well-known).* {{
+    location ~ /\\.(?!well-known).* {{
         deny all;
     }}
 }}
@@ -220,10 +220,14 @@ class SecureDomainManager:
             # For demonstration - in real implementation, you'd parse the certificate
             # This is a simplified version that reads from file timestamps
             stat = os.stat(cert_path)
-            cert_age_days = (datetime.now().timestamp() - stat.st_mtime) / 86400
             
-            # Simulate certificate expiry (90 days from creation)
-            days_left = 90 - int(cert_age_days)
+            # Calculate expiry date (90 days from file creation)
+            expiry_timestamp = stat.st_mtime + (90 * 86400)
+            expiry_date = datetime.fromtimestamp(expiry_timestamp)
+            
+            # Calculate days left from today to expiry
+            today = datetime.now()
+            days_left = (expiry_date - today).days
             
             if days_left < 0:
                 status = "expired"
@@ -232,13 +236,11 @@ class SecureDomainManager:
             else:
                 status = "valid"
 
-            expiry_date = datetime.fromtimestamp(stat.st_mtime + (90 * 86400))
-
             return {
                 "has_ssl": True,
                 "status": status,
                 "expiry_date": expiry_date.strftime('%Y-%m-%d'),
-                "days_left": max(0, days_left)
+                "days_left": days_left
             }
 
         except Exception as e:
